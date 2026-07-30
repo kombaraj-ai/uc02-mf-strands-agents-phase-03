@@ -16,28 +16,7 @@ and [`infra/terraform/README.md`](../infra/terraform/README.md). This guide is t
 
 ## Overview of what gets deployed
 
-```
-GitHub repo (main branch)
-   │
-   ├── .github/workflows/pr-validate.yml   (automatic, every PR — lint/type/unit tests,
-   │                                         Docker build sanity check, terraform fmt/validate/plan)
-   │
-   └── .github/workflows/deploy.yml        (manual, workflow_dispatch only — the ONLY
-                                             workflow that ever touches AWS)
-                                                │
-                                                ▼
-                                   AWS (one account, three environments
-                                   isolated by naming + separate Terraform
-                                   state — dev / staging / prod)
-                                                │
-                        ┌───────────────────────┼───────────────────────┐
-                        ▼                       ▼                       ▼
-                 ECR (container image)   Bedrock AgentCore        DynamoDB (quant
-                 IAM, CloudWatch         Runtime + Gateway +      metrics) + Bedrock
-                                         Memory                   Knowledge Base
-                                                                  (OpenSearch Serverless
-                                                                   or S3 Vectors)
-```
+![Phase 03 CI/CD flow](Phase-03.png)
 
 Every environment applies in **up to three Terraform passes**
 (`enable_knowledge_base`, `enable_agent_runtime`) because several resources
