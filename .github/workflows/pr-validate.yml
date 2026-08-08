@@ -184,7 +184,18 @@ jobs:
         # applied, and S3 object writes are atomic, so at worst this reads
         # slightly-stale state if a real deploy.yml apply is running for
         # the same environment at the same moment - never a corrupted read.
-        run: terraform plan -out=tfplan -no-color -lock=false
+        #
+        # container_image_uri is deliberately committed as "" (see each
+        # environment's terraform.tfvars) and only ever supplied for real by
+        # deploy.yml's -var at apply time. Whenever enable_agent_runtime is
+        # true, modules/agentcore-runtime's own validation block hard-rejects
+        # an empty URI - which would otherwise fail this read-only plan on
+        # every PR, even with zero real drift. A placeholder value here is
+        # safe: this plan is never applied, so it can never actually push
+        # this fake URI to the real Runtime.
+        run: |
+          terraform plan -out=tfplan -no-color -lock=false \
+            -var="container_image_uri=000000000000.dkr.ecr.us-east-1.amazonaws.com/pr-plan-placeholder:unset"
         continue-on-error: true
       - name: terraform show
         id: show
