@@ -176,7 +176,15 @@ jobs:
       - run: terraform init -backend-config=backend.hcl
       - name: terraform plan
         id: plan
-        run: terraform plan -out=tfplan -no-color
+        # -lock=false: the plan role is deliberately AWS-managed
+        # ReadOnlyAccess (see github-oidc/plan_role.tf) with zero mutating
+        # actions, including S3 writes - so it can't acquire Terraform's
+        # native S3 state lock (a PutObject on a *.tflock sentinel object).
+        # Safe to skip here: this plan is read-only/advisory and never
+        # applied, and S3 object writes are atomic, so at worst this reads
+        # slightly-stale state if a real deploy.yml apply is running for
+        # the same environment at the same moment - never a corrupted read.
+        run: terraform plan -out=tfplan -no-color -lock=false
         continue-on-error: true
       - name: terraform show
         id: show
