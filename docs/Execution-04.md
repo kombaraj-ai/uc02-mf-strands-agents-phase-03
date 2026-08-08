@@ -120,7 +120,7 @@ region = "us-east-1"
 Then:
 
 ```powershell
-terraform init -backend-config=backend.hcl
+terraform init -backend-config="backend.hcl"
 terraform plan
 terraform apply
 terraform output plan_role_arn
