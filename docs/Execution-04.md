@@ -72,10 +72,21 @@ bucket exists):
 ```powershell
 cd infra/terraform/bootstrap
 terraform init
+terraform plan       # review before applying — see the note below
 terraform apply
 terraform output state_bucket_name      # note this — every later backend.hcl needs it
 terraform output state_bucket_region
 ```
+
+> **If you're re-running this after a full prior teardown** (this account has been
+> torn down to zero resources before, including this exact state bucket), the
+> `bootstrap/` directory's local `terraform.tfstate` file may still believe the
+> bucket exists even though it's genuinely gone from AWS. This is expected and
+> harmless: `terraform plan`/`apply` refreshes against real AWS first, notices the
+> bucket is actually missing, and plans a normal **create** — not an error, and not
+> a destroy/recreate of anything else. If `terraform plan` shows anything other than
+> a clean "N to add" for the bucket and its supporting resources (versioning,
+> encryption, public-access block), stop and re-check rather than applying blind.
 
 ### 3. Apply the GitHub OIDC identity module (one-time, local)
 
@@ -187,7 +198,7 @@ they play no role here):
 | `MODEL_PROVIDER` | `ollama` | Forced to `bedrock` by Terraform for the **dev** container specifically (`environments/dev/main.tf`'s `environment_variables`), since `effective_model_provider` only auto-forces Bedrock when `environment != "dev"`. staging/prod don't need this override — `environment != "dev"` already forces it for them. |
 | `BEDROCK_MODEL_ID` | `anthropic.claude-3-5-sonnet-20241022-v2:0` (code default — **end-of-life**, do not use) | All three environments' committed `terraform.tfvars` override this to `amazon.nova-lite-v1:0` (`ON_DEMAND`-invokable, no inference-profile IAM complexity, confirmed sufficient for this project's structured-output need). |
 | `AWS_REGION` | `us-east-1` | Region for both Bedrock and every other AWS call. Set from `var.aws_region`. |
-| `DATA_BACKEND` | `local` | `local` \| `aws`. **See the Known Issues note below — this is not currently set for the dev container's Terraform, so dev's deployed Runtime currently falls back to local SQLite/Chroma instead of DynamoDB/Knowledge Base.** staging/prod are unaffected (`environment != "dev"` forces `aws` regardless of this variable). |
+| `DATA_BACKEND` | `local` | `local` \| `aws`. Forced to `aws` by Terraform for the **dev** container specifically (`environments/dev/main.tf`'s `environment_variables`, mirroring the `MODEL_PROVIDER` override), since `effective_data_backend` only auto-forces `aws` when `environment != "dev"`. staging/prod don't need this override — `environment != "dev"` already forces it for them. |
 | `DYNAMODB_TABLE_NAME` | `""` | Set automatically from `module.dynamodb.table_name`. |
 | `BEDROCK_KNOWLEDGE_BASE_ID` | `""` | Set automatically from `module.knowledge_base[0].knowledge_base_id` — empty string until `enable_knowledge_base = true` has been applied. |
 | `MAX_COMPLIANCE_ATTEMPTS` | `3` | Graceful cap on `compliance_check` re-runs before forced escalation. Not overridden by Terraform; change via a code-level default if ever needed. |
@@ -200,34 +211,27 @@ sets the AWS-sourced ones (`DYNAMODB_TABLE_NAME`, `BEDROCK_KNOWLEDGE_BASE_ID`,
 container's process environment variables at deploy time — no `.env` file is baked
 into the image (see the `Dockerfile`'s own comment on this).
 
-### ⚠️ Known issue: dev's deployed container does not set `DATA_BACKEND=aws`
+### ✅ Fixed: dev's deployed container now sets `DATA_BACKEND=aws`
 
-`infra/terraform/environments/dev/main.tf`'s `agentcore_runtime` module sets
-`MODEL_PROVIDER = "bedrock"` explicitly (with a comment explaining exactly why:
-`effective_model_provider` only auto-forces Bedrock when `environment != "dev"`, and
-the deployed container's own `ENVIRONMENT` is `"dev"`). The parallel case for data
-was never added: `effective_data_backend` has the identical `environment != "dev"`
-gate, so the dev container — whose `ENVIRONMENT` is also `"dev"` — resolves
-`effective_data_backend` to whatever `DATA_BACKEND` is set to, which defaults to
-`"local"` since Terraform never sets it. staging/prod don't hit this because their
-`ENVIRONMENT` is `"staging"`/`"prod"`, which unconditionally forces `"aws"`.
+`infra/terraform/environments/dev/main.tf`'s `agentcore_runtime` module sets both
+`MODEL_PROVIDER = "bedrock"` and `DATA_BACKEND = "aws"` explicitly in its
+`environment_variables` block (each with a comment explaining why: both
+`effective_model_provider` and `effective_data_backend` only auto-force their
+AWS-backed value when `environment != "dev"`, and the deployed container's own
+`ENVIRONMENT` is `"dev"` — so without an explicit override, the dev container would
+otherwise fall back to Ollama / local SQLite-Chroma, neither of which is reachable
+or meaningful in a deployed AWS container). staging/prod never needed either
+override — their `ENVIRONMENT` unconditionally forces both to their AWS-backed
+values already.
 
-**Practical effect**: as currently committed, the *dev* deployed Runtime likely falls
-back to an ephemeral local SQLite/Chroma store seeded with the same mock fund values,
-rather than genuinely reading DynamoDB/the Bedrock Knowledge Base you provision below
-— even though the numbers returned will look identical (the mock data is
-byte-for-byte the same in both stores), so this is easy to miss in a smoke test.
-staging and prod are not affected.
-
-**Recommended fix** (not yet applied — flagging for a deliberate decision, not
-silently changing infra): add one line to `environments/dev/main.tf`'s
-`environment_variables` block, mirroring the existing `MODEL_PROVIDER` line:
-
-```hcl
-DATA_BACKEND = "aws"
-```
-
-Ask if you'd like this applied before or after your first dev deploy.
+This previously caused a real, easy-to-miss gap: an earlier build of this module
+only had the `MODEL_PROVIDER` override, so dev's deployed Runtime silently fell back
+to an ephemeral local SQLite/Chroma store seeded with the same mock fund values —
+the numbers returned looked identical (the mock data is byte-for-byte the same in
+both stores), which is exactly what made it easy to miss in a smoke test. Both
+overrides are now present as of this guide's current revision — no action needed
+from you here, this section is left in as a record of the gap in case you're
+diffing against an older checkout.
 
 ---
 

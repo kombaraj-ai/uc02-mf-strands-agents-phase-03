@@ -191,7 +191,16 @@ module "agentcore_runtime" {
     # invocation fails with a connection error. Force Bedrock explicitly here;
     # staging/prod don't need this since `environment != "dev"` already forces
     # it for them.
-    MODEL_PROVIDER                 = "bedrock"
+    MODEL_PROVIDER = "bedrock"
+    # Same reasoning as MODEL_PROVIDER above, for data instead of
+    # generation: `Settings.effective_data_backend` only forces "aws"
+    # (DynamoDB + Bedrock Knowledge Base) when `environment != "dev"`.
+    # Without this, the deployed dev container falls back to DATA_BACKEND's
+    # default of "local" (ephemeral SQLite/Chroma seeded with the same mock
+    # values) instead of genuinely reading the DynamoDB table / Knowledge
+    # Base this module provisions - easy to miss in a smoke test since the
+    # mock data is byte-for-byte identical either way.
+    DATA_BACKEND                   = "aws"
     DYNAMODB_TABLE_NAME            = module.dynamodb.table_name
     OPENSEARCH_COLLECTION_ENDPOINT = module.opensearch_serverless.collection_endpoint
     BEDROCK_KNOWLEDGE_BASE_ID      = var.enable_knowledge_base ? module.knowledge_base[0].knowledge_base_id : ""
