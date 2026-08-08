@@ -6,7 +6,7 @@ locals {
   # Single source of truth for whether the OpenSearch Serverless collection
   # (and its access policy) should exist at all - spelled out once here so
   # collection creation and access-policy creation can never desync. false
-  # only when the dev-only vector_store_backend = "s3_vectors" is selected.
+  # only when the dev-only vector_store_backend = "s3_vectors" is selected..
   opensearch_enabled = var.vector_store_backend == "opensearch"
 
   common_tags = {

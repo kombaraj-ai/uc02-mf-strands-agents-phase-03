@@ -6,5 +6,15 @@
 github_org  = "<your-github-org-or-username>"
 github_repo = "<your-repo-name>"
 
+# GitHub's OIDC "sub" claim embeds each entity's stable numeric ID
+# (repo:OWNER@OWNER_ID/REPO@REPO_ID:...), not just the plain org/repo names -
+# get both "id" fields from `GET /orgs/<org>` and `GET /repos/<org>/<repo>`
+# (the GitHub API, or just open those URLs in a browser while logged in).
+# A mismatch here causes every AssumeRoleWithWebIdentity call to fail with
+# "Not authorized to perform sts:AssumeRoleWithWebIdentity" - visible via
+# CloudTrail, not from GitHub Actions' own logs.
+github_org_id  = "<your-github-org-numeric-id>"
+github_repo_id = "<your-repo-numeric-id>"
+
 # From: terraform -chdir=infra/terraform/bootstrap output state_bucket_name
 state_bucket_name = "amc-orchestrator-tfstate-<account-id>"
