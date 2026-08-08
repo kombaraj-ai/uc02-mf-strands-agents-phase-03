@@ -316,7 +316,7 @@ for the application environments themselves.
 
 Any change to `main` goes through a PR first. `pr-validate.yml` runs automatically
 and, for Terraform changes, posts a `terraform plan` as a PR comment per environment
-(using the read-only `plan` role — never mutates AWS). Merge once green.
+(using the read-only `plan` role — never mutates AWS). Merge once green..
 
 ### Step 2 — Deploy `dev`
 
