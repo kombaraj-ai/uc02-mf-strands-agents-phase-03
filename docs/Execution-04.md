@@ -484,15 +484,25 @@ for the complete detail):
 
 ```powershell
 cd infra/terraform/environments/dev   # or staging / prod
-terraform destroy
+terraform destroy -var="container_image_uri=placeholder-not-used-for-destroy"
 ```
 
-`force_delete`/`force_destroy` are already set on the ECR repo, S3 docs bucket, and
-OpenSearch index modules, so a fresh environment's first-ever destroy should
-complete cleanly (`0 added, 0 changed, N destroyed`) without manual AWS-API
-workarounds. Confirm with `terraform state list` (empty = fully torn down). A fresh
-3-pass apply is required before using the environment again — this guide, from
-[Step 2](#step-2--deploy-dev), covers exactly that.
+`container_image_uri` is required even for `destroy`: it's committed as `""` in
+each environment's `terraform.tfvars` (a real value is only ever supplied via
+`-var` at apply time, by `deploy.yml` or a manual apply) and
+`modules/agentcore-runtime`'s own `validation` block hard-rejects an empty value
+whenever `enable_agent_runtime = true` — Terraform evaluates that validation to
+build the resource graph even for a destroy that never creates anything, so a
+bare `terraform destroy` fails before deleting a single resource. Any
+non-empty placeholder string works; it's never actually used.
+
+`force_delete`/`force_destroy` are already set on the ECR repo, S3 docs bucket,
+S3 Vectors bucket, and OpenSearch index modules, so a fresh environment's
+first-ever destroy should complete cleanly (`0 added, 0 changed, N destroyed`)
+without manual AWS-API workarounds. Confirm with `terraform state list` (empty
+= fully torn down). A fresh 3-pass apply is required before using the
+environment again — this guide, from [Step 2](#step-2--deploy-dev), covers
+exactly that.
 
 ---
 
